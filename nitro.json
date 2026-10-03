@@ -1,0 +1,23 @@
+{
+  "cxxNamespace": ["datetimepickerprompt"],
+  "ios": {
+    "iosModuleName": "DatetimePickerPrompt"
+  },
+  "android": {
+    "androidNamespace": ["datetimepickerprompt"],
+    "androidCxxLibName": "datetimepickerprompt"
+  },
+  "autolinking": {
+    "DatetimePickerPrompt": {
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "DatetimePickerPrompt"
+      },
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "DatetimePickerPrompt"
+      }
+    }
+  },
+  "ignorePaths": ["node_modules"]
+}
