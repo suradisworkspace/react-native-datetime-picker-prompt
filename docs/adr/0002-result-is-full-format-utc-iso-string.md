@@ -1,0 +1,7 @@
+# pick() result is always a full combined-format UTC ISO 8601 string
+
+Regardless of `PickMode` (`date`, `time`, or `datetime`), `pick()` resolves a complete `YYYY-MM-DDTHH:mm:ss.sssZ` string. The part the user didn't pick (time for `date` mode, date for `time` mode) is defaulted, and callers in those modes are expected to read only the relevant part. The timestamp is UTC, not local time with an offset.
+
+We considered a format that varies by mode (`"2026-10-03"` for date-only, `"14:30:00"` for time-only) and rejected it: a return type whose shape changes based on an input argument is harder to document and consume than one stable, always-`new Date()`-parseable shape. We also considered encoding local time with a UTC offset instead of `Z`. Both notations represent the identical instant — `new Date()` and local getters (`.getHours()`, etc.) round-trip to the same wall-clock values either way — so this wasn't a correctness trade-off, just a format choice; UTC was picked because it's JavaScript's own default (`Date.prototype.toISOString()`) and the most common wire format for storage/transmission, so callers don't have to think about offsets to do the common thing.
+
+Worth remembering if this surprises someone later: a raw string comparison or regex against the ISO string (rather than parsing it into a `Date`) will show UTC clock values, not the local wall-clock time the user actually picked.
