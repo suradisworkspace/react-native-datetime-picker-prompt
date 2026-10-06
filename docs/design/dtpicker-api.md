@@ -2,7 +2,7 @@
 
 Status: implemented (TS public API, Nitro boundary, iOS bottom sheet, Android chained dialogs). Compiled and smoke-tested on both platforms via the example app; see the `## Verification` section below.
 
-See [`CONTEXT.md`](../../CONTEXT.md) for terminology (Pick, PickMode, Cancel, Dismiss, Result) and `docs/adr/0001`–`0007` for why these choices were made.
+See [`CONTEXT.md`](../../CONTEXT.md) for terminology (Pick, PickMode, Cancel, Dismiss, Result) and `docs/adr/0001`–`0008` for why these choices were made.
 
 ## Public API
 
@@ -16,8 +16,6 @@ type PickModeValue = `${PickMode}`; // 'date' | 'time' | 'datetime'
 
 export interface PickOptions {
   mode: PickModeValue;   // required — no default
-  cancelText?: string;   // optional, platform-default fallback if omitted
-  confirmText?: string;  // optional, platform-default fallback if omitted
   minimumDate?: string;  // ISO 8601 UTC string — see ADR 0007
   maximumDate?: string;  // ISO 8601 UTC string
   defaultValue?: string; // ISO 8601 UTC string — picker opens to this instead of "now"
@@ -35,8 +33,6 @@ export const DTPicker: {
 ```ts
 export interface NitroPickOptions {
   mode: 'date' | 'time' | 'datetime';
-  cancelText?: string;
-  confirmText?: string;
   minimumDate?: string;
   maximumDate?: string;
   defaultValue?: string;
@@ -49,7 +45,7 @@ export interface DatetimePickerPrompt extends HybridObject<{ios: 'swift'; androi
 }
 ```
 
-Struct-based options (not positional params) — switched once the parameter count grew past `cancelText`/`confirmText`. Plain string-literal union for `mode` within the struct, not the `PickMode` enum — see ADR 0003.
+Struct-based options (not positional params) — switched once the parameter count grew past a couple of fields. Plain string-literal union for `mode` within the struct, not the `PickMode` enum — see ADR 0003.
 
 ## Behavior
 
@@ -62,14 +58,14 @@ Struct-based options (not positional params) — switched once the parameter cou
 | `pick()` called while one is already open | The **second** call's promise rejects with an `Error` carrying a `code` field (e.g. `E_ALREADY_VISIBLE`). The first call is unaffected. |
 | Native failure (e.g. no active Activity/window on Android) | Rejects with an `Error` carrying a distinguishing `code`. |
 | Android `'datetime'` mode: date confirmed, then time step cancelled | Whole call resolves `null` — not a partial result with a defaulted time. See ADR 0004. |
-| `cancelText` / `confirmText` omitted | Falls back to each platform's own localized default label, matching device language (iOS: `UIBarButtonItem` system items; Android: native dialog defaults) — see ADR 0006. |
+| Cancel/Done (iOS) and dialog buttons (Android) | Always the platform default — no `cancelText`/`confirmText` override exists. iOS: `UIBarButtonItem` system items, which render as localized text pre-iOS 26 and as icons (✕/✓) on iOS 26+ per Liquid Glass. Android: native dialog defaults, OS-localized. See ADR 0006. |
 | `minimumDate`/`maximumDate`/`defaultValue`/`timezone` | Compared mode-aware (date-only / time-only / full-instant); `timezone` (IANA id) governs interpretation, omitted = device-local. `defaultValue` outside bounds is clamped into range. `minimumDate > maximumDate` or an unparseable date string rejects `E_INVALID_RANGE`; an unrecognized `timezone` rejects `E_INVALID_TIMEZONE`. Android has no native min/max-time API, so an out-of-range *picked* time (not default) resolves as picked. See ADR 0007. |
 
 ## Platform UI
 
-**iOS**: Custom bottom sheet, presented modally, slides up like the keyboard using the real keyboard's own animation timing/curve (`0.25s`, keyboard curve — see ADR 0005). Fixed, content-hugging height (no drag-to-resize). No title/header. Background and toolbar colors are sampled to match the real system keyboard (light `RGB(209,212,217)`, dark `RGB(44,44,44)`), not `.systemBackground`. No dimmed backdrop, unlike a typical modal sheet — matches the real keyboard, which doesn't dim the screen either — but the backdrop stays tap-to-cancel (invisible, not visible). A real `UIToolbar` above the picker: Cancel (left) / Done (right), rendered via `UIBarButtonItem(barButtonSystemItem: .cancel/.done)` when no override is given (localizes to device language automatically — see ADR 0006), or a custom-titled item when `cancelText`/`confirmText` are provided. `UIDatePicker` in `.wheels` style, used uniformly for `date`, `time`, and `datetime` modes. Dismissible via Cancel button, backdrop tap, or swipe-down — all three resolve `null`.
+**iOS**: Custom bottom sheet, presented modally, slides up using the keyboard's own animation timing/curve (`0.25s`, keyboard curve — see ADR 0005). Fixed, content-hugging height (no drag-to-resize). No title/header. Redesigned as a modern system-overlay popup for iOS 26+'s Liquid Glass era (see ADR 0005): blurred, semi-transparent dark backdrop; dark sheet surface with a hairline divider between toolbar and picker wheel; the picker wheel's container stretches to the sheet's bottom edge and fills the safe-area gap (home-indicator area) with its own color, no separate bar. A real `UIToolbar` above the picker: Cancel (left) / Done (right), always `UIBarButtonItem(barButtonSystemItem: .cancel/.done)` — no override exists. These render as localized text pre-iOS 26, and as icons (✕/✓) on iOS 26+ automatically, with zero app-side version branching — see ADR 0006. `UIDatePicker` in `.wheels` style, used uniformly for `date`, `time`, and `datetime` modes. Dismissible via Cancel button, backdrop tap, or swipe-down — all three resolve `null`.
 
-**Android**: Native `DatePickerDialog` / `TimePickerDialog`, OS-default theme/styling (no custom chrome). `date` mode → `DatePickerDialog` only. `time` mode → `TimePickerDialog` only. `datetime` mode → `DatePickerDialog` then, on confirm, `TimePickerDialog`; cancelling either dialog resolves the whole call `null` (see table above). `cancelText`/`confirmText` relabel the dialog's native buttons when provided.
+**Android**: Native `DatePickerDialog` / `TimePickerDialog`, OS-default theme/styling (no custom chrome). `date` mode → `DatePickerDialog` only. `time` mode → `TimePickerDialog` only. `datetime` mode → `DatePickerDialog` then, on confirm, `TimePickerDialog`; cancelling either dialog resolves the whole call `null` (see table above). Dialog buttons always use the OS's own default labels — no override exists.
 
 ## Explicit non-goals for v1
 
@@ -77,6 +73,7 @@ Struct-based options (not positional params) — switched once the parameter cou
 - No wraparound (overnight) `minimumDate`/`maximumDate` ranges for `'time'` mode — see ADR 0007.
 - No visual theming/style customization — platform OS defaults only (`.wheels` on iOS, native Material dialog on Android).
 - No queuing/stacking of concurrent `pick()` calls — the second call rejects immediately.
+- No `cancelText`/`confirmText` override (removed; previously existed). iOS 26's Liquid Glass renders system Cancel/Done items as icons automatically, and a custom-titled button never gets that treatment on any iOS version — mixing an icon default with a text override reads as a bug, not a feature. Both platforms now always use the OS's own default button labels. See ADR 0006.
 
 ## Verification
 

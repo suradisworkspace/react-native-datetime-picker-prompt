@@ -4,8 +4,6 @@ export type NitroPickMode = 'date' | 'time' | 'datetime';
 
 export interface NitroPickOptions {
   mode: NitroPickMode;
-  cancelText?: string;
-  confirmText?: string;
   minimumDate?: string;
   maximumDate?: string;
   defaultValue?: string;

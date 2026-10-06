@@ -8,8 +8,6 @@ export type PickModeValue = `${PickMode}`;
 
 export interface PickOptions {
   mode: PickModeValue;
-  cancelText?: string;
-  confirmText?: string;
   /** ISO 8601 UTC string. */
   minimumDate?: string;
   /** ISO 8601 UTC string. */

@@ -33,11 +33,7 @@ async function pickDateTime() {
 
 `mode` is required and selects what the picker captures: `PickMode.Date`, `PickMode.Time`, or `PickMode.DateTime` (plain strings `'date'` / `'time'` / `'datetime'` also work). The result is always a full ISO 8601 string in UTC; cancelling resolves `null` rather than throwing.
 
-Pass `cancelText` / `confirmText` to override the platform-default button labels:
-
-```js
-await DTPicker.pick({ mode: PickMode.Date, cancelText: 'Close', confirmText: 'Select' });
-```
+Button labels always use the platform default — the device's localized Cancel/Done on iOS (rendered as icons on iOS 26+ per Apple's Liquid Glass design, text on earlier versions, automatically) and the native dialog's own defaults on Android. There's no `cancelText`/`confirmText` override; see [ADR 0006](docs/adr/0006-ios-cancel-confirm-localized-via-system-button-items.md) for why.
 
 Call `DTPicker.dismiss()` to force-close an open picker from code (e.g. if the screen that opened it unmounts) — it resolves the pending promise with `null`, same as a user cancel, and is a no-op if nothing is open.
 
@@ -60,6 +56,11 @@ await DTPicker.pick({
 
 See [`docs/design/dtpicker-api.md`](docs/design/dtpicker-api.md) for the full behavior spec and [`docs/adr/`](docs/adr/) for the design decisions behind it.
 
+## Troubleshooting
+
+**App crashes on launch when built with Xcode 27 (iOS 27 SDK), with `EXC_BREAKPOINT` in `_UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption`.** This isn't caused by this library — `DTPicker`'s own iOS code already presents on the scene-based key window. It's Apple's new hard requirement (TN3187) that a host app adopt the `UIScene` lifecycle; apps that don't now fail to launch instead of just logging a warning. Fix it in *your* app:
+- **Expo (SDK 57)**: add [`expo-build-properties`](https://docs.expo.dev/versions/latest/sdk/build-properties/) and set `ios.enableSceneSupport: true`, then `npx expo prebuild --clean`. See [ADR 0008](docs/adr/0008-ios27-scene-lifecycle-example-app.md) for what that changes and why a scene manifest alone isn't enough. SDK 58+ adopts the scene lifecycle by default and no longer needs the flag.
+- **Bare React Native**: there's no official upstream fix yet as of this writing — see [facebook/react-native#54739](https://github.com/react/react-native/issues/54739) and [RFC #967](https://github.com/react-native-community/discussions-and-proposals/pull/967) (both open). Until one lands, you'd need to hand-roll a `SceneDelegate` or use a third-party shim.
 
 ## Contributing
 

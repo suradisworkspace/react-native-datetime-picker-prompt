@@ -7,7 +7,9 @@ private struct PickValidationError: Error {
 
 class DatetimePickerPrompt: HybridDatetimePickerPromptSpec {
   private var isShowing = false
-  private weak var activeSheet: DTPickerBottomSheetController?
+  // iOS 26+ gets DTPickerGlassSheetController, earlier versions keep
+  // DTPickerBottomSheetController unchanged — see DTPickerSheetPresentable.
+  private weak var activeSheet: (any DTPickerSheetPresentable)?
 
   public func pick(options: NitroPickOptions) throws -> Promise<Variant_NullType_String> {
     let promise = Promise<Variant_NullType_String>()
@@ -68,25 +70,39 @@ class DatetimePickerPrompt: HybridDatetimePickerPromptSpec {
         return
       }
 
-      let sheet = DTPickerBottomSheetController(
-        mode: options.mode,
-        cancelText: options.cancelText,
-        confirmText: options.confirmText,
-        minimumDate: minimumDate,
-        maximumDate: maximumDate,
-        defaultValue: defaultValue,
-        timeZone: timeZone,
-        onCancel: { [weak self] in
-          self?.isShowing = false
-          self?.activeSheet = nil
-          promise.resolve(withResult: .first(.null))
-        },
-        onConfirm: { [weak self] date in
-          self?.isShowing = false
-          self?.activeSheet = nil
-          promise.resolve(withResult: .second(Self.isoString(from: date)))
-        }
-      )
+      let onCancel: () -> Void = { [weak self] in
+        self?.isShowing = false
+        self?.activeSheet = nil
+        promise.resolve(withResult: .first(.null))
+      }
+      let onConfirm: (Date) -> Void = { [weak self] date in
+        self?.isShowing = false
+        self?.activeSheet = nil
+        promise.resolve(withResult: .second(Self.isoString(from: date)))
+      }
+
+      let sheet: any DTPickerSheetPresentable
+      if #available(iOS 26, *) {
+        sheet = DTPickerGlassSheetController(
+          mode: options.mode,
+          minimumDate: minimumDate,
+          maximumDate: maximumDate,
+          defaultValue: defaultValue,
+          timeZone: timeZone,
+          onCancel: onCancel,
+          onConfirm: onConfirm
+        )
+      } else {
+        sheet = DTPickerBottomSheetController(
+          mode: options.mode,
+          minimumDate: minimumDate,
+          maximumDate: maximumDate,
+          defaultValue: defaultValue,
+          timeZone: timeZone,
+          onCancel: onCancel,
+          onConfirm: onConfirm
+        )
+      }
       self.activeSheet = sheet
       presenter.present(sheet, animated: false)
     }

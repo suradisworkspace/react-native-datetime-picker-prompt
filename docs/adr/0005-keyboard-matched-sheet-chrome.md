@@ -1,7 +1,33 @@
-# iOS sheet chrome is matched to the real system keyboard
+# iOS sheet chrome redesigned as a modern bottom popup (iOS 26+)
 
-The iOS bottom sheet (ADR 0004) is meant to feel like a keyboard accessory, but its animation and colors were originally hand-picked approximations rather than actually matched to the real keyboard. Three changes bring it closer: the present/dismiss/snap-back animations now share one duration and curve (`0.25s`, `UIView.AnimationOptions(rawValue: 7 << 16)`) instead of three different hand-picked `curveEaseIn`/`curveEaseOut`/implicit values — `7` is UIKit's long-standing, undocumented-but-stable keyboard curve, reused via the standard community trick of encoding a raw `UIViewAnimationCurve` value into the public `UIView.AnimationOptions` bitmask (bits 16-19). The sheet's background and toolbar now use colors sampled directly from the real keyboard via simulator screenshots — light `RGB(209,212,217)`, dark `RGB(44,44,44)` — instead of `.systemBackground` (which is pure black in dark mode; the real keyboard is a dark charcoal gray, not black) and `.secondarySystemBackground` for the toolbar (a different, mismatched gray from the picker area below it). And the dimmed backdrop is gone — the real keyboard has no dimming behind it — leaving an invisible full-screen `backdropView` that still carries the same tap gesture, so backdrop-tap-to-cancel (recorded for ADR 0004) keeps working exactly as before; this is a visual refinement of that decision, not a reversal of it.
+The iOS bottom sheet has been redesigned from the keyboard-matched style (ADR 0005 original) to a modern **system overlay bottom popup** aesthetic suitable for iOS 26+. This is a visual redesign, not a behavior change — the picker interaction (swipe-to-dismiss, tap-to-cancel, animation timing) remains identical.
 
-The background color was *not* a free choice: `UIInputView(frame: .zero, inputViewStyle: .keyboard)` — the public UIKit API whose whole purpose is rendering the same material the system keyboard uses — was tried first as a drop-in replacement for `sheetView`. On-device/simulator testing showed it renders as a plain flat white/black when used as a freestanding subview inside a normal presented `UIViewController`, not the real keyboard material; that background apparently only activates when a view is actually hosted as a responder's `inputView`/`inputAccessoryView`, which this custom sheet isn't. `sheetView` was kept as a plain `UIView` and given the sampled colors explicitly instead.
+## Visual changes
 
-Both approximations carry a standing risk worth remembering if a future reader considers "cleaning them up": the `7 << 16` curve value and the sampled RGB values are not documented, stable API — they're snapshot facts about the current iOS keyboard's rendering, observed empirically rather than declared by Apple. If a future iOS version changes the keyboard's curve or background, this sheet will silently drift again rather than fail loudly, and the fix each time is the same empirical process (sample the real keyboard, update the constants) rather than a one-time correctness fix.
+**Backdrop**: Semi-transparent dark overlay (`RGBA(0,0,0,0.4)`) with UIBlurEffect (`style: .dark`) behind the sheet, creating depth and focus without a full modal dim.
+
+**Sheet background**: Dark surface `RGBA(30,30,32,0.95)` with increased corner radius (`16` instead of `12`) to match modern iOS design language.
+
+**Toolbar + picker area**: Both use the same dark surface color for visual cohesion, separated by a subtle hairline divider (`RGBA(80,80,80,0.3)` dark / `RGBA(200,200,200,0.3)` light) to suggest structure without harshness.
+
+**Picker wheel area**: Slightly darker background (`RGBA(40,40,42,1.0)`), set on a `datePickerContainer` wrapper rather than the `UIDatePicker` itself, for depth separation from the toolbar. The container stretches all the way to `sheetView`'s bottom edge; the picker inside it is inset only from the container's *safe-area* bottom. That makes the safe-area gap below the picker (home-indicator area) show the same container color rather than a seam.
+
+An earlier version of this redesign added a separate 12pt "bottom strip" bar in the keycap color to fill that gap — on dark mode that rendered as a `RGB(106,106,106)` mid-grey bar, visibly brighter than the `RGBA(30,30,32)` sheet around it, which read as a stray bar rather than an anchor. Removed in favor of the container-color approach above, which has no visible seam at all.
+
+## Why this approach
+
+The keyboard-matched design (original ADR 0005) was historically accurate but visually limiting: it forced the sheet to look exactly like the system keyboard, which isn't a modal dialog but a keyboard accessory — different context, different design language. The new system overlay style signals "this is a focused modal choice," uses the darker surface typical of iOS 26+ modals (consistent with bottom sheets in Settings, Photos, Music), and the hairline divider reduces visual "flatness" that accumulated when all areas were the same color.
+
+The blur backdrop (absent in the keyboard design) adds atmospheric depth; the semi-transparent overlay prevents the dimmed content from feeling too washed out while keeping the focus on the picker itself.
+
+## Implementation notes
+
+- `UIBlurEffect(style: .dark)` provides consistent blur across light/dark modes.
+- The hairline divider uses a low-alpha color (0.3) to stay subtle and not compete with content.
+- Animation curve and timing (`0.25s`, `UIView.AnimationOptions(rawValue: 7 << 16)`) remain unchanged from the keyboard-matched style.
+- All colors are adaptive (`UIColor(traits in:)` closures), though the iOS 26 redesign targets dark-mode visuals primarily; light mode follows the same pattern with lighter surface/divider values.
+
+## Future considerations
+
+- The sampled RGB values are empirical snapshots of iOS 26's design language, not declared API. If future iOS versions shift the visual language, these constants may need updating.
+- The blur style is locked to `.dark` for now; if the app gains a light theme option, consider `.extraLight` or `.light` as alternatives.

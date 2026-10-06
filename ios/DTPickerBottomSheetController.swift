@@ -1,21 +1,25 @@
 import UIKit
 
+/// Used on iOS <26 — see DTPickerGlassSheetController for the iOS 26+ design.
 /// See docs/adr/0004-platform-specific-picker-ui.md and docs/adr/0005-keyboard-matched-sheet-chrome.md.
-final class DTPickerBottomSheetController: UIViewController {
+final class DTPickerBottomSheetController: UIViewController, DTPickerSheetPresentable {
   // `7 << 16` is UIKit's private keyboard animation curve, packed into the public AnimationOptions bitmask.
   private static let keyboardAnimationOptions = UIView.AnimationOptions(rawValue: 7 << 16)
   private static let keyboardAnimationDuration: TimeInterval = 0.25
 
-  // Sampled from the real keyboard — UIInputView(inputViewStyle: .keyboard) doesn't render this material standalone.
-  private static let keyboardBackgroundColor = UIColor { traits in
+  // iOS 26+ system overlay style: semi-transparent dark background with blur
+  private static let overlayBackgroundColor = UIColor { traits in
+    UIColor(red: 0, green: 0, blue: 0, alpha: 0.4)
+  }
+
+  // Hairline divider color
+  private static let dividerColor = UIColor { traits in
     traits.userInterfaceStyle == .dark
-      ? UIColor(red: 44 / 255, green: 44 / 255, blue: 44 / 255, alpha: 1.0)
-      : UIColor(red: 209 / 255, green: 212 / 255, blue: 217 / 255, alpha: 1.0)
+      ? UIColor(red: 80 / 255, green: 80 / 255, blue: 80 / 255, alpha: 0.3)
+      : UIColor(red: 200 / 255, green: 200 / 255, blue: 200 / 255, alpha: 0.3)
   }
 
   private let mode: NitroPickMode
-  private let cancelText: String?
-  private let confirmText: String?
   private let minimumDate: Date?
   private let maximumDate: Date?
   private let defaultValue: Date?
@@ -31,8 +35,6 @@ final class DTPickerBottomSheetController: UIViewController {
 
   init(
     mode: NitroPickMode,
-    cancelText: String?,
-    confirmText: String?,
     minimumDate: Date?,
     maximumDate: Date?,
     defaultValue: Date?,
@@ -41,8 +43,6 @@ final class DTPickerBottomSheetController: UIViewController {
     onConfirm: @escaping (Date) -> Void
   ) {
     self.mode = mode
-    self.cancelText = cancelText
-    self.confirmText = confirmText
     self.minimumDate = minimumDate
     self.maximumDate = maximumDate
     self.defaultValue = defaultValue
@@ -69,8 +69,32 @@ final class DTPickerBottomSheetController: UIViewController {
       UITapGestureRecognizer(target: self, action: #selector(handleBackdropTap))
     )
 
-    sheetView.backgroundColor = Self.keyboardBackgroundColor
-    sheetView.layer.cornerRadius = 12
+    // Add blur effect behind the sheet
+    let blurEffect = UIBlurEffect(style: .dark)
+    let blurView = UIVisualEffectView(effect: blurEffect)
+    blurView.translatesAutoresizingMaskIntoConstraints = false
+    backdropView.addSubview(blurView)
+    NSLayoutConstraint.activate([
+      blurView.topAnchor.constraint(equalTo: backdropView.topAnchor),
+      blurView.leadingAnchor.constraint(equalTo: backdropView.leadingAnchor),
+      blurView.trailingAnchor.constraint(equalTo: backdropView.trailingAnchor),
+      blurView.bottomAnchor.constraint(equalTo: backdropView.bottomAnchor),
+    ])
+
+    // Semi-transparent overlay
+    let overlayView = UIView()
+    overlayView.backgroundColor = Self.overlayBackgroundColor
+    overlayView.translatesAutoresizingMaskIntoConstraints = false
+    backdropView.addSubview(overlayView)
+    NSLayoutConstraint.activate([
+      overlayView.topAnchor.constraint(equalTo: backdropView.topAnchor),
+      overlayView.leadingAnchor.constraint(equalTo: backdropView.leadingAnchor),
+      overlayView.trailingAnchor.constraint(equalTo: backdropView.trailingAnchor),
+      overlayView.bottomAnchor.constraint(equalTo: backdropView.bottomAnchor),
+    ])
+
+    sheetView.backgroundColor = UIColor(red: 30 / 255, green: 30 / 255, blue: 32 / 255, alpha: 0.95)
+    sheetView.layer.cornerRadius = 16
     sheetView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
     sheetView.clipsToBounds = true
     sheetView.translatesAutoresizingMaskIntoConstraints = false
@@ -78,13 +102,20 @@ final class DTPickerBottomSheetController: UIViewController {
     sheetView.addGestureRecognizer(
       UIPanGestureRecognizer(target: self, action: #selector(handlePan))
     )
-
+    
+    let datePickerContainer = UIView()
+    datePickerContainer.translatesAutoresizingMaskIntoConstraints = false
+    datePickerContainer.backgroundColor = UIColor(red: 40 / 255, green: 40 / 255, blue: 42 / 255, alpha: 1.0)
+    datePickerContainer.addSubview(datePicker)
+    sheetView.addSubview(datePickerContainer)
+    
     let toolbar = makeToolbar()
     toolbar.translatesAutoresizingMaskIntoConstraints = false
     sheetView.addSubview(toolbar)
 
     datePicker.preferredDatePickerStyle = .wheels
     datePicker.datePickerMode = mode.uiDatePickerMode
+    
     datePicker.timeZone = timeZone
     datePicker.minimumDate = minimumDate
     datePicker.maximumDate = maximumDate
@@ -92,7 +123,6 @@ final class DTPickerBottomSheetController: UIViewController {
       datePicker.date = defaultValue
     }
     datePicker.translatesAutoresizingMaskIntoConstraints = false
-    sheetView.addSubview(datePicker)
 
     NSLayoutConstraint.activate([
       backdropView.topAnchor.constraint(equalTo: view.topAnchor),
@@ -108,11 +138,16 @@ final class DTPickerBottomSheetController: UIViewController {
       toolbar.leadingAnchor.constraint(equalTo: sheetView.leadingAnchor),
       toolbar.trailingAnchor.constraint(equalTo: sheetView.trailingAnchor),
       toolbar.heightAnchor.constraint(equalToConstant: 44),
+      
+      datePickerContainer.topAnchor.constraint(equalTo: toolbar.bottomAnchor),
+      datePickerContainer.leadingAnchor.constraint(equalTo: sheetView.leadingAnchor),
+      datePickerContainer.trailingAnchor.constraint(equalTo: sheetView.trailingAnchor),
+      datePickerContainer.bottomAnchor.constraint(equalTo: sheetView.bottomAnchor),
 
-      datePicker.topAnchor.constraint(equalTo: toolbar.bottomAnchor),
-      datePicker.leadingAnchor.constraint(equalTo: sheetView.leadingAnchor),
-      datePicker.trailingAnchor.constraint(equalTo: sheetView.trailingAnchor),
-      datePicker.bottomAnchor.constraint(equalTo: sheetView.safeAreaLayoutGuide.bottomAnchor),
+      datePicker.topAnchor.constraint(equalTo: datePickerContainer.topAnchor),
+      datePicker.leadingAnchor.constraint(equalTo: datePickerContainer.leadingAnchor),
+      datePicker.trailingAnchor.constraint(equalTo: datePickerContainer.trailingAnchor),
+      datePicker.bottomAnchor.constraint(equalTo: datePickerContainer.safeAreaLayoutGuide.bottomAnchor),
     ])
   }
 
@@ -139,25 +174,48 @@ final class DTPickerBottomSheetController: UIViewController {
   }
 
   private func makeToolbar() -> UIView {
+    let container = UIView()
+    container.backgroundColor = .clear
+
     let toolbar = UIToolbar()
     toolbar.isTranslucent = false
-    toolbar.barTintColor = Self.keyboardBackgroundColor
+    toolbar.barTintColor = UIColor(red: 30 / 255, green: 30 / 255, blue: 32 / 255, alpha: 0.95)
     toolbar.clipsToBounds = true
+    toolbar.translatesAutoresizingMaskIntoConstraints = false
+    container.addSubview(toolbar)
 
-    // No override → UIBarButtonItem's system item renders Apple's own localized
-    // title, matching the device language for free. See docs/adr/0005.
-    let cancelItem = cancelText.map {
-      UIBarButtonItem(title: $0, style: .plain, target: self, action: #selector(handleCancelTapped))
-    } ?? UIBarButtonItem(barButtonSystemItem: .cancel, target: self, action: #selector(handleCancelTapped))
-
-    let confirmItem = confirmText.map {
-      UIBarButtonItem(title: $0, style: .done, target: self, action: #selector(handleConfirmTapped))
-    } ?? UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(handleConfirmTapped))
+    // Always system items, never a custom title — Apple's own localized title
+    // renders automatically (device language, zero translation data), and on
+    // iOS 26+ these auto-render as icons (✕ / ✓) per the Liquid Glass design
+    // language. A custom title would never get that icon treatment on any iOS
+    // version, which is exactly why there's no override here. See docs/adr/0005
+    // and docs/adr/0006.
+    let cancelItem = UIBarButtonItem(barButtonSystemItem: .cancel, target: self, action: #selector(handleCancelTapped))
+    let confirmItem = UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(handleConfirmTapped))
 
     let flexibleSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
     toolbar.items = [cancelItem, flexibleSpace, confirmItem]
 
-    return toolbar
+    // Add hairline divider below toolbar
+    let divider = UIView()
+    divider.backgroundColor = Self.dividerColor
+    divider.translatesAutoresizingMaskIntoConstraints = false
+    container.addSubview(divider)
+
+    NSLayoutConstraint.activate([
+      toolbar.topAnchor.constraint(equalTo: container.topAnchor),
+      toolbar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+      toolbar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+      toolbar.heightAnchor.constraint(equalToConstant: 44),
+
+      divider.topAnchor.constraint(equalTo: toolbar.bottomAnchor),
+      divider.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+      divider.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+      divider.heightAnchor.constraint(equalToConstant: 1),
+      divider.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+    ])
+
+    return container
   }
 
   private func close(completion: @escaping () -> Void) {

@@ -106,7 +106,6 @@ class DatetimePickerPrompt : HybridDatetimePickerPromptSpec() {
         // Android's native TimePicker has no min/max-time API — a picked time
         // outside [minimumDate, maximumDate] resolves as picked. See docs/adr/0007.
         timeDialog.setOnCancelListener { resolveCancelled() }
-        applyButtonLabels(timeDialog, options.cancelText, options.confirmText)
         activeDialog = timeDialog
         timeDialog.show()
       }
@@ -129,7 +128,6 @@ class DatetimePickerPrompt : HybridDatetimePickerPromptSpec() {
         minimumDate?.let { dateDialog.datePicker.minDate = reanchorToDeviceTimeZone(it).timeInMillis }
         maximumDate?.let { dateDialog.datePicker.maxDate = reanchorToDeviceTimeZone(it).timeInMillis }
         dateDialog.setOnCancelListener { resolveCancelled() }
-        applyButtonLabels(dateDialog, options.cancelText, options.confirmText)
         activeDialog = dateDialog
         dateDialog.show()
       }
@@ -150,21 +148,6 @@ class DatetimePickerPrompt : HybridDatetimePickerPromptSpec() {
       // cancel() (not dismiss()) so the existing onCancelListener resolves the
       // pending promise with null, same outcome as a user-initiated Cancel.
       activeDialog?.cancel()
-    }
-  }
-
-  private fun applyButtonLabels(
-    dialog: android.app.AlertDialog,
-    cancelText: String?,
-    confirmText: String?
-  ) {
-    dialog.setOnShowListener {
-      if (cancelText != null) {
-        dialog.getButton(DialogInterface.BUTTON_NEGATIVE)?.text = cancelText
-      }
-      if (confirmText != null) {
-        dialog.getButton(DialogInterface.BUTTON_POSITIVE)?.text = confirmText
-      }
     }
   }
 
