@@ -12,19 +12,35 @@ import UIKit
 /// - Step 3: the Cancel/Done toolbar replaced by a single prominent "Done"
 ///   pill plus a smaller, de-emphasized "Cancel" link. Backdrop blur removed
 ///   per direct feedback; backdrop is now dim-only, no blur.
-/// - Step 3a (this pass, direct feedback): action bar moved back above the
-///   picker — a bottom-of-a-tall-floating-card button is a harder reach than
-///   one near the top. Both buttons are icon-only now (checkmark/xmark)
-///   rather than text, matching iOS 26's own Done/Cancel icon convention.
-/// - Later: a mode-derived header.
+/// - Step 3a: action bar moved back above the picker — a bottom-of-a-tall
+///   floating-card button is a harder reach than one near the top. Both
+///   buttons are icon-only now (checkmark/xmark) rather than text, matching
+///   iOS 26's own Done/Cancel icon convention.
+/// - Step 4 (this pass): backdrop dim lightened from 40% to 15% black. 40%
+///   alone (no blur softening it since step 3 removed that) read heavier
+///   than the "barely dims the screen" AirPods reference calls for.
+/// - Step 5: tried an internal mode-derived header (SF Symbol + title) above
+///   the picker, then reverted it — hardcoded English text made every other
+///   localization-conscious choice in this file (ADR 0006's whole point)
+///   feel pointless. No header; the "no title/header" non-goal stands.
+/// - `iosDisplay` prop (new, both this controller and the iOS <26 one):
+///   `preferredDatePickerStyle` is now `.wheels` or `.inline` per the prop,
+///   default `.wheels` — addresses `.dateAndTime` mode's single hard-to-jump
+///   combined date column by letting the caller opt into `.inline`'s
+///   calendar grid instead. Except `.time` mode, which always forces
+///   `.wheels` regardless of the prop — `.inline` has no calendar to
+///   navigate for a time-only picker and visibly looked worse there (direct
+///   feedback). See `NitroPickMode.resolvedDatePickerStyle`.
 @available(iOS 26, *)
 final class DTPickerGlassSheetController: UIViewController, DTPickerSheetPresentable {
   private static let keyboardAnimationOptions = UIView.AnimationOptions(rawValue: 7 << 16)
   private static let keyboardAnimationDuration: TimeInterval = 0.25
 
   // Backdrop: dim only, no blur — blur was removed per direct feedback.
+  // 15%, not 40%: with no blur to soften it, 40% alone read heavier than the
+  // "barely dims the screen" AirPods reference calls for.
   private static let overlayBackgroundColor = UIColor { _ in
-    UIColor(red: 0, green: 0, blue: 0, alpha: 0.4)
+    UIColor(red: 0, green: 0, blue: 0, alpha: 0.15)
   }
 
   // Floating-card geometry.
@@ -39,6 +55,7 @@ final class DTPickerGlassSheetController: UIViewController, DTPickerSheetPresent
   private let maximumDate: Date?
   private let defaultValue: Date?
   private let timeZone: TimeZone
+  private let iosDisplay: NitroIosPickerDisplay?
   private let onCancel: () -> Void
   private let onConfirm: (Date) -> Void
 
@@ -54,6 +71,7 @@ final class DTPickerGlassSheetController: UIViewController, DTPickerSheetPresent
     maximumDate: Date?,
     defaultValue: Date?,
     timeZone: TimeZone,
+    iosDisplay: NitroIosPickerDisplay?,
     onCancel: @escaping () -> Void,
     onConfirm: @escaping (Date) -> Void
   ) {
@@ -62,6 +80,7 @@ final class DTPickerGlassSheetController: UIViewController, DTPickerSheetPresent
     self.maximumDate = maximumDate
     self.defaultValue = defaultValue
     self.timeZone = timeZone
+    self.iosDisplay = iosDisplay
     self.onCancel = onCancel
     self.onConfirm = onConfirm
     super.init(nibName: nil, bundle: nil)
@@ -140,7 +159,7 @@ final class DTPickerGlassSheetController: UIViewController, DTPickerSheetPresent
     datePickerContainer.addSubview(datePicker)
     cardView.addSubview(datePickerContainer)
 
-    datePicker.preferredDatePickerStyle = .wheels
+    datePicker.preferredDatePickerStyle = mode.resolvedDatePickerStyle(iosDisplay: iosDisplay)
     datePicker.datePickerMode = mode.uiDatePickerMode
     datePicker.timeZone = timeZone
     datePicker.minimumDate = minimumDate

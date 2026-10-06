@@ -89,6 +89,7 @@ class DatetimePickerPrompt: HybridDatetimePickerPromptSpec {
           maximumDate: maximumDate,
           defaultValue: defaultValue,
           timeZone: timeZone,
+          iosDisplay: options.iosDisplay,
           onCancel: onCancel,
           onConfirm: onConfirm
         )
@@ -99,6 +100,7 @@ class DatetimePickerPrompt: HybridDatetimePickerPromptSpec {
           maximumDate: maximumDate,
           defaultValue: defaultValue,
           timeZone: timeZone,
+          iosDisplay: options.iosDisplay,
           onCancel: onCancel,
           onConfirm: onConfirm
         )

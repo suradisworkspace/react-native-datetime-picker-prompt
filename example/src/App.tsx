@@ -11,6 +11,7 @@ import {
   DTPicker,
   PickMode,
   DTPickerError,
+  type PickModeType,
 } from 'react-native-datetime-picker-prompt';
 
 export default function App() {
@@ -73,6 +74,23 @@ export default function App() {
     }
   };
 
+  const pickInline = async (mode: PickModeType) => {
+    setError(null);
+    try {
+      const value = await DTPicker.pick({
+        mode: mode,
+        iosDisplay: 'inline',
+      });
+      setResult(value);
+    } catch (e) {
+      if (e instanceof DTPickerError) {
+        setError(`${e.code}: ${e.message}`);
+      } else {
+        setError(String(e));
+      }
+    }
+  };
+
   return (
     <View style={[styles.container, theme.container]}>
       <Button title="Pick date" onPress={() => pick(PickMode.Date)} />
@@ -83,6 +101,18 @@ export default function App() {
       />
       <Button title="Pick with bounds (+1h to +2h)" onPress={pickWithBounds} />
       <Button title="Pick time in Asia/Tokyo" onPress={pickInTokyo} />
+      <Button
+        title="Pick date (inline, iOS)"
+        onPress={() => pickInline(PickMode.Date)}
+      />
+      <Button
+        title="Pick time (inline, iOS)"
+        onPress={() => pickInline(PickMode.Time)}
+      />
+      <Button
+        title="Pick date & time (inline, iOS)"
+        onPress={() => pickInline(PickMode.DateTime)}
+      />
       <Button title="Dismiss" onPress={() => DTPicker.dismiss()} />
       <Text style={theme.text}>Result: {result ?? '(none)'}</Text>
       <TextInput

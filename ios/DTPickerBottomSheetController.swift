@@ -24,6 +24,7 @@ final class DTPickerBottomSheetController: UIViewController, DTPickerSheetPresen
   private let maximumDate: Date?
   private let defaultValue: Date?
   private let timeZone: TimeZone
+  private let iosDisplay: NitroIosPickerDisplay?
   private let onCancel: () -> Void
   private let onConfirm: (Date) -> Void
 
@@ -39,6 +40,7 @@ final class DTPickerBottomSheetController: UIViewController, DTPickerSheetPresen
     maximumDate: Date?,
     defaultValue: Date?,
     timeZone: TimeZone,
+    iosDisplay: NitroIosPickerDisplay?,
     onCancel: @escaping () -> Void,
     onConfirm: @escaping (Date) -> Void
   ) {
@@ -47,6 +49,7 @@ final class DTPickerBottomSheetController: UIViewController, DTPickerSheetPresen
     self.maximumDate = maximumDate
     self.defaultValue = defaultValue
     self.timeZone = timeZone
+    self.iosDisplay = iosDisplay
     self.onCancel = onCancel
     self.onConfirm = onConfirm
     super.init(nibName: nil, bundle: nil)
@@ -113,7 +116,7 @@ final class DTPickerBottomSheetController: UIViewController, DTPickerSheetPresen
     toolbar.translatesAutoresizingMaskIntoConstraints = false
     sheetView.addSubview(toolbar)
 
-    datePicker.preferredDatePickerStyle = .wheels
+    datePicker.preferredDatePickerStyle = mode.resolvedDatePickerStyle(iosDisplay: iosDisplay)
     datePicker.datePickerMode = mode.uiDatePickerMode
     
     datePicker.timeZone = timeZone

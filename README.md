@@ -54,6 +54,14 @@ await DTPicker.pick({
 - `timezone` — an IANA identifier (e.g. `'Asia/Bangkok'`). Governs interpretation of `minimumDate`/`maximumDate`/`defaultValue` *and* what the user picks, independent of the device's own timezone. Omit it to use the device's current local timezone. An unrecognized identifier rejects with code `E_INVALID_TIMEZONE`.
 - **Android only**: there's no native API to constrain which *times* are selectable (unlike dates, which are fully enforced) — a user can pick a time outside `[minimumDate, maximumDate]` for `'time'` mode or the time-step of `'datetime'`. See [ADR 0007](docs/adr/0007-min-max-default-and-timezone.md) for why.
 
+### iOS picker style
+
+```js
+await DTPicker.pick({ mode: PickMode.DateTime, iosDisplay: 'inline' });
+```
+
+- `iosDisplay` — `'wheel'` (default) or `'inline'`, maps to `UIDatePickerStyle.wheels`/`.inline`. **iOS only, no effect on Android** (`DatePickerDialog`/`TimePickerDialog` have no equivalent style choice). `'inline'` shows a calendar grid for the date portion instead of a scrolling wheel — useful for `'datetime'` mode in particular, since `.wheels` + `.dateAndTime` shows the date as one combined column (e.g. "Wed Nov 15") rather than separate month/day/year wheels, making it slow to jump to a date far from the default. **Ignored for `PickMode.Time`** — always renders as `.wheels` there, since `'inline'`'s calendar navigation doesn't apply to a time-only picker.
+
 See [`docs/design/dtpicker-api.md`](docs/design/dtpicker-api.md) for the full behavior spec and [`docs/adr/`](docs/adr/) for the design decisions behind it.
 
 ## Troubleshooting

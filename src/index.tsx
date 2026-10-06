@@ -2,7 +2,8 @@ export { DTPicker } from './DTPicker';
 export {
   PickMode,
   DTPickerError,
-  type PickModeValue,
+  type PickModeType,
   type PickOptions,
   type DTPickerErrorCode,
+  type IosPickerDisplay,
 } from './PickMode';

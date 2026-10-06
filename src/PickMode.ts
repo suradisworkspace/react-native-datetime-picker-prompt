@@ -4,10 +4,24 @@ export enum PickMode {
   DateTime = 'datetime',
 }
 
-export type PickModeValue = `${PickMode}`;
+export type PickModeType = `${PickMode}`;
+
+/**
+ * `UIDatePickerStyle` choice for the iOS picker — `'wheel'` is `.wheels`
+ * (the current look), `'inline'` is `.inline` (a calendar grid for the date
+ * portion, letting you jump to a far date via month/year navigation instead
+ * of spinning through individual days). No effect on Android, which has no
+ * such distinction (`DatePickerDialog`/`TimePickerDialog` are OS-themed,
+ * no style choice).
+ *
+ * Ignored for `PickMode.Time` — always `.wheels` there regardless of this
+ * value. `'inline'`'s whole benefit is calendar navigation, which doesn't
+ * exist for a time-only picker, and it visibly looks worse than wheels there.
+ */
+export type IosPickerDisplay = 'wheel' | 'inline';
 
 export interface PickOptions {
-  mode: PickModeValue;
+  mode: PickModeType;
   /** ISO 8601 UTC string. */
   minimumDate?: string;
   /** ISO 8601 UTC string. */
@@ -16,6 +30,8 @@ export interface PickOptions {
   defaultValue?: string;
   /** IANA identifier, e.g. `'Asia/Bangkok'`. */
   timezone?: string;
+  /** iOS only. Default `'wheel'`. See {@link IosPickerDisplay}. */
+  iosDisplay?: IosPickerDisplay;
 }
 
 export type DTPickerErrorCode =
