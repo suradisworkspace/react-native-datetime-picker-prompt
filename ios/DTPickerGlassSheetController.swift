@@ -2,43 +2,18 @@ import UIKit
 
 /// iOS 26+ redesign: a floating card, styled after the AirPods pairing popup,
 /// rather than the edge-to-edge bottom sheet `DTPickerBottomSheetController`
-/// uses on iOS <26. See docs/adr/0005-keyboard-matched-sheet-chrome.md and the
-/// `ios26-liquid-glass-design` design note for the accepted direction.
+/// uses on iOS <26. See docs/adr/0005-keyboard-matched-sheet-chrome.md and
+/// the `ios26-liquid-glass-design` design note for the full history.
 ///
-/// Built incrementally, one visual change at a time:
-/// - Step 1 (done): outer shape — margins on all sides, all four corners rounded.
-/// - Step 2 (done): `cardView`'s own base surface is real `UIGlassEffect`
-///   material instead of a flat color.
-/// - Step 3: the Cancel/Done toolbar replaced by a single prominent "Done"
-///   pill plus a smaller, de-emphasized "Cancel" link. Backdrop blur removed
-///   per direct feedback; backdrop is now dim-only, no blur.
-/// - Step 3a: action bar moved back above the picker — a bottom-of-a-tall
-///   floating-card button is a harder reach than one near the top. Both
-///   buttons are icon-only now (checkmark/xmark) rather than text, matching
-///   iOS 26's own Done/Cancel icon convention.
-/// - Step 4 (this pass): backdrop dim lightened from 40% to 15% black. 40%
-///   alone (no blur softening it since step 3 removed that) read heavier
-///   than the "barely dims the screen" AirPods reference calls for.
-/// - Step 5: tried an internal mode-derived header (SF Symbol + title) above
-///   the picker, then reverted it — hardcoded English text made every other
-///   localization-conscious choice in this file (ADR 0006's whole point)
-///   feel pointless. No header; the "no title/header" non-goal stands.
-/// - `iosDisplay` prop (new, both this controller and the iOS <26 one):
-///   `preferredDatePickerStyle` is now `.wheels` or `.inline` per the prop,
-///   default `.wheels` — addresses `.dateAndTime` mode's single hard-to-jump
-///   combined date column by letting the caller opt into `.inline`'s
-///   calendar grid instead. Except `.time` mode, which always forces
-///   `.wheels` regardless of the prop — `.inline` has no calendar to
-///   navigate for a time-only picker and visibly looked worse there (direct
-///   feedback). See `NitroPickMode.resolvedDatePickerStyle`.
+/// `iosDisplay` maps to `UIDatePickerStyle.wheels`/`.inline`, except `.time`
+/// mode always forces `.wheels` — no calendar to navigate for a time-only
+/// picker. See `NitroPickMode.resolvedDatePickerStyle`.
 @available(iOS 26, *)
 final class DTPickerGlassSheetController: UIViewController, DTPickerSheetPresentable {
   private static let keyboardAnimationOptions = UIView.AnimationOptions(rawValue: 7 << 16)
   private static let keyboardAnimationDuration: TimeInterval = 0.25
 
-  // Backdrop: dim only, no blur — blur was removed per direct feedback.
-  // 15%, not 40%: with no blur to soften it, 40% alone read heavier than the
-  // "barely dims the screen" AirPods reference calls for.
+  // Backdrop: dim only, no blur — see ADR 0005 for the 15% value.
   private static let overlayBackgroundColor = UIColor { _ in
     UIColor(red: 0, green: 0, blue: 0, alpha: 0.15)
   }
@@ -62,8 +37,10 @@ final class DTPickerGlassSheetController: UIViewController, DTPickerSheetPresent
   private let backdropView = UIView()
   private let cardView = UIView()
   private let datePicker = UIDatePicker()
+  private var cardBottomConstraint: NSLayoutConstraint!
   private var hasPresented = false
   private var isClosing = false
+  private var hasCanceledPhantomSafeArea = false
 
   init(
     mode: NitroPickMode,
@@ -129,10 +106,8 @@ final class DTPickerGlassSheetController: UIViewController, DTPickerSheetPresent
       UIPanGestureRecognizer(target: self, action: #selector(handlePan))
     )
 
-    // Real Liquid Glass material, not a flat color — `.regular` is the
-    // adaptive frosted-chrome style (vs. `.clear`'s lighter, more refractive
-    // look, meant for media). Not interactive: this is the card's own
-    // background, not a control responding to a direct press.
+    // Real Liquid Glass material — `.regular` is the adaptive frosted-chrome
+    // style. Not interactive: it's the card's background, not a control.
     let glassEffect = UIGlassEffect(style: .regular)
     glassEffect.isInteractive = false
     let glassView = UIVisualEffectView(effect: glassEffect)
@@ -145,14 +120,12 @@ final class DTPickerGlassSheetController: UIViewController, DTPickerSheetPresent
       glassView.bottomAnchor.constraint(equalTo: cardView.bottomAnchor),
     ])
 
-    // Action bar back above the picker — a button at the bottom of a tall
-    // floating card is a harder reach than one near the top (direct feedback).
+    // Action bar above the picker, not below — easier one-handed reach.
     let actionBar = makeActionBar()
     actionBar.translatesAutoresizingMaskIntoConstraints = false
     cardView.addSubview(actionBar)
 
-    // Clear, not the old flat RGB(40,40,42) — that was opaque and covered the
-    // glass material (step 2) underneath, for the card's single largest area.
+    // Clear, so the glass material behind it stays visible.
     let datePickerContainer = UIView()
     datePickerContainer.translatesAutoresizingMaskIntoConstraints = false
     datePickerContainer.backgroundColor = .clear
@@ -169,6 +142,10 @@ final class DTPickerGlassSheetController: UIViewController, DTPickerSheetPresent
     }
     datePicker.translatesAutoresizingMaskIntoConstraints = false
 
+    cardBottomConstraint = cardView.bottomAnchor.constraint(
+      equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Self.cardBottomMargin
+    )
+
     NSLayoutConstraint.activate([
       backdropView.topAnchor.constraint(equalTo: view.topAnchor),
       backdropView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -177,7 +154,7 @@ final class DTPickerGlassSheetController: UIViewController, DTPickerSheetPresent
 
       cardView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: Self.cardSideMargin),
       cardView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -Self.cardSideMargin),
-      cardView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Self.cardBottomMargin),
+      cardBottomConstraint,
 
       actionBar.topAnchor.constraint(equalTo: cardView.topAnchor),
       actionBar.leadingAnchor.constraint(equalTo: cardView.leadingAnchor),
@@ -198,6 +175,22 @@ final class DTPickerGlassSheetController: UIViewController, DTPickerSheetPresent
 
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
+
+    // cardView reports a phantom 34pt bottom safe-area inset despite clearing
+    // the home indicator with margin to spare (measured directly, not a
+    // UIDatePicker quirk). Canceling it moves where safeAreaLayoutGuide
+    // sits, so cardBottomConstraint is adjusted to compensate.
+    if !hasCanceledPhantomSafeArea {
+      let measuredBottomInset = view.safeAreaInsets.bottom
+      if measuredBottomInset > 0 {
+        hasCanceledPhantomSafeArea = true
+        additionalSafeAreaInsets.bottom = -measuredBottomInset
+        cardBottomConstraint.constant = -(Self.cardBottomMargin + measuredBottomInset)
+        view.setNeedsLayout()
+        view.layoutIfNeeded()
+      }
+    }
+
     guard !hasPresented else { return }
     // Start off-screen (below the bottom edge) before the first layout pass settles
     // the card's real (content-hugging) height, then animate it into place.
